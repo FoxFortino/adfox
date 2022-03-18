@@ -92,10 +92,14 @@ def train_model(dataDirName, overwrite=False, numTrainBatches=500000, minZ=0., m
 
         sess.run(tf.global_variables_initializer())
 
-        testLabels = labels_indexes_to_arrays(testLabelsIndexes[0:400], nLabels)
-        testImages = testImages[0:400]
-        # testLabelsWithGal = labels_indexes_to_arrays(testLabelsIndexesWithGal[0:200], nLabels)
-        # testImagesWithGal = testImagesWithGal[0:200]
+        # WFF Why were these arrays being indexed to the first 400 elements? I think this was a bug.
+        # testLabels = labels_indexes_to_arrays(testLabelsIndexes[0:400], nLabels)
+        # testImages = testImages[0:400]
+        # # testLabelsWithGal = labels_indexes_to_arrays(testLabelsIndexesWithGal[0:200], nLabels)
+        # # testImagesWithGal = testImagesWithGal[0:200]
+        
+        # WFF Fixing the above bug.
+        testLabels = labels_indexes_to_arrays(testLabelsIndexes, nLabels)
 
         trainImagesCycle = itertools.cycle(trainImages)
         trainLabelsCycle = itertools.cycle(trainLabels)
