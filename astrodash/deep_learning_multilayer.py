@@ -24,7 +24,7 @@ def train_model(dataDirName,
                 numTrainBatches=500000,
                 minZ=0.,
                 maxZ=0.,
-                redshifting=False
+                redshifting=False,
                 chkpt_path=None):  # WFF Added this kwarg
     """  Train model. Unzip and overwrite exisiting training set if overwrite is True"""
     # Open training data files
@@ -78,15 +78,16 @@ def train_model(dataDirName,
     trainArrays = overSampling.over_sample_arrays(smote=False)
     trainImages, trainLabels = trainArrays['images'], trainArrays['labels']
 
-    # # Delete temporary memory mapping files
-    # for filename in glob.glob('shuffled*.dat') + glob.glob('oversampled*.dat'):
-    #     if not os.path.samefile(filename, trainImages.filename) and not os.path.samefile(filename, trainLabels.filename):
-    #         os.remove(filename)
+    # Delete temporary memory mapping files
+    for filename in glob.glob('shuffled*.dat') + glob.glob('oversampled*.dat'):
+        if not os.path.samefile(filename, trainImages.filename) and not os.path.samefile(filename, trainLabels.filename):
+            os.remove(filename)
 
     # Set up the convolutional network architecture
     imWidth = 32  # Image size and width
     imWidthReduc = 8
     a = []
+    epochs = []  # WFF
     x, y_, keep_prob, y_conv, W, b = convnet_variables(imWidth, imWidthReduc, N, nLabels)
 
     with tf.Session() as sess:  # config=tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)) as sess:
@@ -97,6 +98,11 @@ def train_model(dataDirName,
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
         sess.run(tf.global_variables_initializer())
+	
+        # WFF
+        chkpt_files = glob.glob(os.path.join(chkpt_path, "*.data*-of-*"))
+        latest_chkpt = max(chkpt_files, key=os.path.getctime)
+        saver.restore(sess, latest_chkpt)
 
         # WFF Why were these arrays being indexed to the first 400 elements? I think this was a bug.
         # testLabels = labels_indexes_to_arrays(testLabelsIndexes[0:400], nLabels)
@@ -122,7 +128,12 @@ def train_model(dataDirName,
             train_step.run(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
             
             # WFF
-            if i % 10 == 0:
+            chkpt_files = glob.glob(os.path.join(chkpt_path, "*.data*-of-*"))
+            index_files = glob.glob(os.path.join(chkpt_path, "*.index"))
+            for file in chkpt_files + index_files:
+                print(file)
+                os.remove(file)
+            if i % 25 == 0:
                 saver = tf.train.Saver()
                 saver.save(sess,
                            chkpt_path,
@@ -135,12 +146,13 @@ def train_model(dataDirName,
                            save_debug_info=False)
             
             
-            if i % 100 == 0:
+            if i % 50 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 1.0})
                 print("step %d, training accuracy %g" % (i, train_accuracy))
                 testAcc = accuracy.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
                 print("test accuracy %g" % testAcc)
                 a.append(testAcc)
+                epochs.append(i)
                 # if i % 1000 == 0:
                 #     testWithGalAcc = accuracy.eval(feed_dict={x: testImagesWithGal, y_: testLabelsWithGal, keep_prob: 1.0})
                 #     print("test With Gal accuracy %g" % testWithGalAcc)
@@ -150,10 +162,11 @@ def train_model(dataDirName,
         yy = y_conv.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
         cp = correct_prediction.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
         print(cp)
-        for i in range(len(cp)):
-            if cp[i] == False:
-                predictedIndex = np.argmax(yy[i])
-                print(i, testTypeNames[i], typeNamesList[predictedIndex])
+        # WFF I commented this out. Why was it even there?
+        #for i in range(len(cp)):
+        #    if cp[i] == False:
+        #        predictedIndex = np.argmax(yy[i])
+        #        print(i, testTypeNames[i], typeNamesList[predictedIndex])
 
         # SAVE THE MODEL
         saveFilename = os.path.join(dataDirName, "tensorflow_model.ckpt")
@@ -165,7 +178,7 @@ def train_model(dataDirName,
 
     try:
         import matplotlib.pyplot as plt
-        plt.plot(a)
+        plt.plot(epochs, a)
         plt.xlabel("Number of Epochs")
         plt.ylabel("Testing accuracy")
         plt.savefig(os.path.join(dataDirName, "testing_accuracy.png"))
@@ -174,9 +187,10 @@ def train_model(dataDirName,
         print(e)
 
     try:
+        print("testing?")
         calc_model_metrics(saveFilename, testLabelsIndexes, testImages, testTypeNames, typeNamesList)
     except Exception as e:
-        print(e)
+        raise(e)
 
     return modelFilenames
 
