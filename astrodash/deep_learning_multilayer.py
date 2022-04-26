@@ -19,7 +19,13 @@ try:
 except ModuleNotFoundError:
     import tensorflow as tf
 
-def train_model(dataDirName, overwrite=False, numTrainBatches=500000, minZ=0., maxZ=0., redshifting=False):
+def train_model(dataDirName,
+                overwrite=False,
+                numTrainBatches=500000,
+                minZ=0.,
+                maxZ=0.,
+                redshifting=False
+                chkpt_path=None):  # WFF Added this kwarg
     """  Train model. Unzip and overwrite exisiting training set if overwrite is True"""
     # Open training data files
     trainingSet = os.path.join(dataDirName, 'training_set.zip')
@@ -114,6 +120,21 @@ def train_model(dataDirName, overwrite=False, numTrainBatches=500000, minZ=0., m
                     batch_xs[j] = redshift_binned_spectrum(batch_xs[j], z, nIndexes, dwlog, w0, w1, nw, outerVal=0.5)
 
             train_step.run(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
+            
+            # WFF
+            if i % 10 == 0:
+                saver = tf.train.Saver()
+                saver.save(sess,
+                           chkpt_path,
+                           global_step=i,
+                           latest_filename=None,
+                           meta_graph_suffix='meta',
+                           write_meta_graph=False,
+                           write_state=False,
+                           strip_default_attrs=False,
+                           save_debug_info=False)
+            
+            
             if i % 100 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 1.0})
                 print("step %d, training accuracy %g" % (i, train_accuracy))
