@@ -1,3 +1,4 @@
+
 import os
 import pickle
 import matplotlib
@@ -36,11 +37,11 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     np.savetxt(os.path.join(fig_dir, 'confusion_matrix_%s.csv' % name), cm)
     print(cm)
 
-    plt.rcParams['text.usetex'] = True
-    plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
-    font = {'family': 'normal',
-            'size': 16}
-    matplotlib.rc('font', **font)
+    #plt.rcParams['text.usetex'] = True
+    #plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
+    #font = {'family': 'normal',
+    #        'size': 16}
+    #matplotlib.rc('font', **font)
 
     fig = plt.figure(figsize=(15, 12))
     plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin=-1, vmax=1)
@@ -96,6 +97,11 @@ def calc_model_metrics(modelFilename, testLabels, testImages, testTypeNames, typ
             predictedLabels.append(np.argmax(yy[i]))
         predictedLabels = np.array(predictedLabels)
         confMatrix = tf.confusion_matrix(testLabels, predictedLabels).eval()
+
+        # WFF For some reason, snTypes is given as NOne but it is used in the next code block
+        if snTypes is None:
+            snTypes = np.unique([sntype.split(":")[0] for sntype in typeNamesList])
+            print(snTypes)
 
         # Aggregate age conf matrix
         aggregateAgesIndexes = np.arange(0, nBins + 1, int(nBins / len(snTypes)))
