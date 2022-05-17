@@ -237,21 +237,41 @@ class SaveTrainingSet(object):
             os.remove(filename)
 
 
-def create_training_set_files(dataDirName, minZ=0, maxZ=0, numOfRedshifts=80, trainWithHost=True, classifyHost=False,
-                              trainFraction=0.8):
+def create_training_set_files(
+    dataDirName,
+    minZ=0,
+    maxZ=0,
+    numOfRedshifts=80,
+    trainWithHost=True,
+    classifyHost=False,
+    trainFraction=0.8,
+    snidTemplateLocation=None
+        ):
     with open(os.path.join(dataDirName, 'training_params.pickle'), 'rb') as f1:
         pars = pickle.load(f1)
-    nTypes, w0, w1, nw, minAge, maxAge, ageBinSize, typeList = pars['nTypes'], pars['w0'], pars['w1'], \
-                                                               pars['nw'], pars['minAge'], pars['maxAge'], \
-                                                               pars['ageBinSize'], pars['typeList']
+    nTypes = pars['nTypes']
+    w0 = pars['w0']
+    w1 = pars['w1']
+    nw = pars['nw']
+    minAge = pars['minAge']
+    maxAge = pars['maxAge']
+    ageBinSize = pars['ageBinSize']
+    typeList = pars['typeList']
+
     hostList, nHostTypes = None, 1
 
     scriptDirectory = os.path.dirname(os.path.abspath(__file__))
-
-    snidTemplateLocation = os.path.join(scriptDirectory, "../templates/training_set/")
+    
+    if snidTemplateLocation is None:
+        path_training_set = "../templates/training_set/"
+        snidTemplateLocation = os.path.join(scriptDirectory, path_training_set)
+    else:
+        print(f"SNID Template Location redirected to {snidTemplateLocation}")
     snidTempFileList = snidTemplateLocation + 'templist.txt'
+    
     if trainWithHost:
-        galTemplateLocation = os.path.join(scriptDirectory, "../templates/superfit_templates/gal/")
+        path_gal = "../templates/superfit_templates/gal/"
+        galTemplateLocation = os.path.join(scriptDirectory, path_gal)
         galTempFileList = galTemplateLocation + 'gal.list'
         if classifyHost:
             hostList = pars['galTypeList']
@@ -259,9 +279,24 @@ def create_training_set_files(dataDirName, minZ=0, maxZ=0, numOfRedshifts=80, tr
     else:
         galTemplateLocation, galTempFileList = None, None
 
-    saveTrainingSet = SaveTrainingSet(snidTemplateLocation, snidTempFileList, w0, w1, nw, nTypes, minAge, maxAge,
-                                      ageBinSize, typeList, minZ, maxZ, numOfRedshifts, galTemplateLocation,
-                                      galTempFileList, hostList, nHostTypes, trainFraction)
+    saveTrainingSet = SaveTrainingSet(snidTemplateLocation,
+                                      snidTempFileList,
+                                      w0,
+                                      w1,
+                                      nw,
+                                      nTypes,
+                                      minAge,
+                                      maxAge,
+                                      ageBinSize,
+                                      typeList,
+                                      minZ,
+                                      maxZ,
+                                      numOfRedshifts,
+                                      galTemplateLocation,
+                                      galTempFileList,
+                                      hostList,
+                                      nHostTypes,
+                                      trainFraction)
     typeNamesList, typeAmounts = saveTrainingSet.type_amounts()
 
     saveFilename = os.path.join(dataDirName, 'training_set.zip')
@@ -271,8 +306,13 @@ def create_training_set_files(dataDirName, minZ=0, maxZ=0, numOfRedshifts=80, tr
 
 
 if __name__ == '__main__':
-    trainingSetFilename = create_training_set_files('data_files/', minZ=0, maxZ=0, numOfRedshifts=80,
-                                                    trainWithHost=False, classifyHost=False, trainFraction=0.8)
+    trainingSetFilename = create_training_set_files('data_files/',
+                                                    minZ=0,
+                                                    maxZ=0,
+                                                    numOfRedshifts=80,
+                                                    trainWithHost=False,
+                                                    classifyHost=False,
+                                                    trainFraction=0.8)
 
 # # Split by filename instead of by spectra
 # snTempFileList = copy.copy(self.snidTempFileList)
