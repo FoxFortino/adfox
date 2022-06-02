@@ -25,11 +25,12 @@ def train_model(dataDirName,
                 minZ=0.,
                 maxZ=0.,
                 redshifting=False,
-                chkpt_path=None):  # WFF Added this kwarg
+                ckpt_path=None):  # WFF Added this kwarg
     """  Train model. Unzip and overwrite exisiting training set if overwrite is True"""
     # Open training data files
     trainingSet = os.path.join(dataDirName, 'training_set.zip')
     extractedFolder = os.path.join(dataDirName, 'training_set')
+    print(trainingSet, extractedFolder)
     # zipRef = zipfile.ZipFile(trainingSet, 'r')
     # zipRef.extractall(extractedFolder)
     # zipRef.close()
@@ -74,14 +75,18 @@ def train_model(dataDirName,
     N = 1024
     nIndexes, dwlog, w0, w1, nw = calc_params_for_log_redshifting(dataDirName)
 
-    overSampling = OverSampling(nLabels, N, images=trainImages, labels=trainLabels)
-    trainArrays = overSampling.over_sample_arrays(smote=False)
-    trainImages, trainLabels = trainArrays['images'], trainArrays['labels']
+    # WFF comment this out for now
+    # overSampling = OverSampling(nLabels, N, images=trainImages, labels=trainLabels)
+    # trainArrays = overSampling.over_sample_arrays(smote=False)
+    # trainImages, trainLabels = trainArrays['images'], trainArrays['labels']
 
     # Delete temporary memory mapping files
     for filename in glob.glob('shuffled*.dat') + glob.glob('oversampled*.dat'):
-        if not os.path.samefile(filename, trainImages.filename) and not os.path.samefile(filename, trainLabels.filename):
-            os.remove(filename)
+    #     if not os.path.samefile(filename, trainImages.filename) and not os.path.samefile(filename, trainLabels.filename):
+        os.remove(filename)
+    # WFF The above code block was originally commented out but I uncommented all of it.
+    # However, trainImages and trainLabels seemed to be a numpy array and had no .filename attribute.
+    # Therefore I only commented out the if statement above because I still wanted these large temporary files to get deleted.
 
     # Set up the convolutional network architecture
     imWidth = 32  # Image size and width
@@ -100,9 +105,16 @@ def train_model(dataDirName,
         sess.run(tf.global_variables_initializer())
 	
         # WFF
-        chkpt_files = glob.glob(os.path.join(chkpt_path, "*.data*-of-*"))
-        latest_chkpt = max(chkpt_files, key=os.path.getctime)
-        saver.restore(sess, latest_chkpt)
+        ckpts = glob.glob(os.path.join(ckpt_path, "*.index"))
+        print(ckpts)
+        if len(ckpts) != 0:
+            latest_ckpt = max(ckpts, key=os.path.getctime)
+            batch_index = int(latest_ckpt.split(".index")[0].split("-")[1])
+            print(f"Reloading checkpoint at epoch {batch_index}.")
+            saver = tf.train.Saver()
+            saver.restore(sess, latest_ckpt.split(".index")[0])
+        else:
+            batch_index = 0
 
         # WFF Why were these arrays being indexed to the first 400 elements? I think this was a bug.
         # testLabels = labels_indexes_to_arrays(testLabelsIndexes[0:400], nLabels)
@@ -116,6 +128,8 @@ def train_model(dataDirName,
         trainImagesCycle = itertools.cycle(trainImages)
         trainLabelsCycle = itertools.cycle(trainLabels)
         for i in range(numTrainBatches):
+            if i == 0:
+                i += batch_index
             batch_xs = np.array(list(itertools.islice(trainImagesCycle, 50 * i, 50 * i + 50)))
             batch_ys = labels_indexes_to_arrays(list(itertools.islice(trainLabelsCycle, 50 * i, 50 * i + 50)), nLabels)
 
@@ -128,25 +142,20 @@ def train_model(dataDirName,
             train_step.run(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
             
             # WFF
-            chkpt_files = glob.glob(os.path.join(chkpt_path, "*.data*-of-*"))
-            index_files = glob.glob(os.path.join(chkpt_path, "*.index"))
-            for file in chkpt_files + index_files:
-                print(file)
-                os.remove(file)
             if i % 25 == 0:
+                print(f"Epoch {i}")
+                data_files = glob.glob(os.path.join(ckpt_path, "*.data*"))
+                index_files = glob.glob(os.path.join(ckpt_path, "*.index"))
+                meta_files = glob.glob(os.path.join(ckpt_path, "*.meta"))
+                for file in data_files + index_files + meta_files:
+                    print(file)
+                    os.remove(file)
+
                 saver = tf.train.Saver()
                 saver.save(sess,
-                           chkpt_path,
-                           global_step=i,
-                           latest_filename=None,
-                           meta_graph_suffix='meta',
-                           write_meta_graph=False,
-                           write_state=False,
-                           strip_default_attrs=False,
-                           save_debug_info=False)
+                           os.path.join(ckpt_path, "model"),
+                           global_step=i)
             
-            
-            if i % 50 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 1.0})
                 print("step %d, training accuracy %g" % (i, train_accuracy))
                 testAcc = accuracy.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
@@ -162,7 +171,7 @@ def train_model(dataDirName,
         yy = y_conv.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
         cp = correct_prediction.eval(feed_dict={x: testImages, y_: testLabels, keep_prob: 1.0})
         print(cp)
-        # WFF I commented this out. Why was it even there?
+        # WFF I commented this out. Probably was there for debugging but it just made a mess.
         #for i in range(len(cp)):
         #    if cp[i] == False:
         #        predictedIndex = np.argmax(yy[i])
